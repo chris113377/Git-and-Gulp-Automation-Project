@@ -1,4 +1,5 @@
 const {src, dest, series, watch} = require('gulp');
+const browserSync = require('browser-sync').create();
 const prefix = require('gulp-autoprefixer');
 const concat = require('gulp-concat');
 const miniCSS = require('gulp-clean-css');
@@ -7,7 +8,8 @@ const babel = require('gulp-babel');
 const uglify = require('gulp-uglify');
 
 function html() {
-  return src('./src/*.html').pipe(dest('./dest'));
+  return src('./src/*.html').pipe(dest('./dest'))
+  .pipe(browserSync.stream());
 }
 
 function css() {
@@ -16,41 +18,43 @@ function css() {
         cascade: false
     }))
     .pipe(miniCSS())
-    .pipe(dest('./dest/css/'));
+    .pipe(dest('./dest/css/'))
+    .pipe(browserSync.stream());
 }
 
 function js() {
   return src(['./src/js/resources.js', './src/js/app.js', './src/js/engine.js'])
   .pipe(babel({
-    presets: ['@babel/preset-env']
+    presets: [
+        ['@babel/preset-env', {modules: false}]
+]
   }))
   .pipe(concat('main.js'))
-//   .pipe(uglify())
-  .pipe(dest('./dest/js/'));
+  .pipe(uglify())
+  .pipe(dest('./dest/js/'))
+  .pipe(browserSync.stream());
 }
 
-function imagePng() {
-  return src('./src/images/*.png')
-    .pipe(imagemin())
-    .pipe(dest('./dest/images'));
+function image() {
+  return src('./src/images/*')
+    .pipe(imagemin([
+        imagemin.optipng({optimizationLevel: 5}),
+        imagemin.jpegtran({progressive: true})
+    ]))
+    .pipe(dest('./dest/images'))
+    .pipe(browserSync.stream());
 }
-//[imagemin.optipng({optimizationLevel: 5})]
-function imageJpg() {
-    return src('./src/images/*.jpg')
-      .pipe(imagemin())
-      .pipe(dest('./dest/images'));
-  }
-//[imagemin.jpegtran({progressive: true})]
+
 function sync() {
-  watch('./src/*.html').on('change', series(html, browserSync.reload));
-  watch('./src/css/**/*.scss').on('change', series(css, browserSync.reload));
-  watch('./src/js/*.js').on('change', series(js, browserSync.reload));
-  watch('./src/images/*.jpg').on('change', series(image, browserSync.reload));
-}
+    browserSync.init({
+      server: {
+        baseDir: "./dest"
+      }
+    });
+    watch('./src/*.html').on('change', series(html, browserSync.reload));
+    watch('./src/css/**/*.css').on('change', series(css, browserSync.reload));
+    watch('./src/js/*.js').on('change', series(js, browserSync.reload));
+    watch('./src/images/*').on('change', series(image, browserSync.reload));
+  }
 
-exports.all = series(html, css, js, imagePng, imageJpg);
-exports.css = css;
-exports.imagePng = imagePng;
-exports.imageJpg = imageJpg;
-exports.html = html;
-exports.js = js;
+exports.all = series(html, css, js, image, sync);
